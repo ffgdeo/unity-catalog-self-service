@@ -16,10 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Parse issue body
+      - name: Parse and validate issue body
         id: parse
         env:
           BODY: ${{ github.event.issue.body }}
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           extract() {
             python3 -c "
@@ -27,7 +30,9 @@ jobs:
           body = os.environ['BODY']
           label = sys.argv[1]
           m = re.search(r'^###\s+' + re.escape(label) + r'\s*\n+(.+?)(?=\n###|\Z)', body, re.M | re.S)
-          if not m: sys.exit(f'missing field: {label}')
+          if not m:
+              print('', end='')
+              sys.exit(0)
           print(m.group(1).strip())
           " "$1"
           }
@@ -39,8 +44,23 @@ jobs:
           data_domain=$(extract "Data domain")
           description=$(extract "Catalog description")
 
-          if ! [[ "$catalog_name" =~ ^[a-z][a-z0-9_]*$ ]]; then
-            echo "::error::catalog_name must be lowercase letters, digits, and underscores. Got: $catalog_name"
+          errors=""
+          if [ -z "$catalog_name" ]; then
+            errors+="- Catalog name is required."$'\n'
+          elif ! [[ "$catalog_name" =~ ^[a-z][a-z0-9_]*$ ]]; then
+            errors+="- Catalog name \`$catalog_name\` is invalid. Unity Catalog requires lowercase letters, digits, and underscores only (no hyphens, no uppercase). Try \`${catalog_name//-/_}\` instead."$'\n'
+          fi
+          [ -z "$storage_root" ]    && errors+="- Storage root is required."$'\n'
+          [ -z "$data_owner_team" ] && errors+="- Data owner GitHub team is required."$'\n'
+          [ -z "$cost_center" ]     && errors+="- Cost center is required."$'\n'
+          [ -z "$data_domain" ]     && errors+="- Data domain is required."$'\n'
+          [ -z "$description" ]     && errors+="- Catalog description is required."$'\n'
+
+          if [ -n "$errors" ]; then
+            comment="The request could not be processed:"$'\n\n'"$errors"$'\n'"Please open a new request with corrected values."
+            gh issue comment "$ISSUE_NUMBER" -R "$REPO" -b "$comment"
+            gh issue close "$ISSUE_NUMBER" -R "$REPO" -r "not planned"
+            echo "::error::Validation failed — see issue comment for details"
             exit 1
           fi
 

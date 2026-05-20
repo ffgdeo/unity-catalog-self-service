@@ -16,20 +16,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Parse issue body
+      - name: Parse and validate issue body
         id: parse
         env:
           BODY: ${{ github.event.issue.body }}
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
-          # Issue Forms render each field as: "### <Label>\n\n<value>\n\n"
-          # We extract each field's value by matching the heading then taking the next non-empty line.
           extract() {
             python3 -c "
           import os, re, sys
           body = os.environ['BODY']
           label = sys.argv[1]
           m = re.search(r'^###\s+' + re.escape(label) + r'\s*\n+(.+?)(?=\n###|\Z)', body, re.M | re.S)
-          if not m: sys.exit(f'missing field: {label}')
+          if not m:
+              print('', end='')
+              sys.exit(0)
           print(m.group(1).strip())
           " "$1"
           }
@@ -40,9 +43,26 @@ jobs:
           cost_center=$(extract "Cost center")
           data_domain=$(extract "Data domain")
 
-          # Validate team_name (lowercase, hyphen, no spaces)
-          if ! [[ "$team_name" =~ ^[a-z][a-z0-9-]*$ ]]; then
-            echo "::error::team_name must be lowercase letters, digits, and hyphens only. Got: $team_name"
+          errors=""
+          if [ -z "$team_name" ]; then
+            errors+="- Team name is required."$'\n'
+          elif ! [[ "$team_name" =~ ^[a-z][a-z0-9-]*$ ]]; then
+            errors+="- Team name \`$team_name\` is invalid. Must be lowercase letters, digits, and hyphens only (e.g. \`data-platform\`)."$'\n'
+          fi
+          if [ -z "$workspace_id" ]; then
+            errors+="- Workspace ID is required."$'\n'
+          elif ! [[ "$workspace_id" =~ ^[0-9]+$ ]]; then
+            errors+="- Workspace ID \`$workspace_id\` is invalid. Must be a numeric Databricks workspace ID."$'\n'
+          fi
+          [ -z "$sandbox_catalog" ] && errors+="- Sandbox catalog is required."$'\n'
+          [ -z "$cost_center" ]     && errors+="- Cost center is required."$'\n'
+          [ -z "$data_domain" ]     && errors+="- Data domain is required."$'\n'
+
+          if [ -n "$errors" ]; then
+            comment="The request could not be processed:"$'\n\n'"$errors"$'\n'"Please open a new request with corrected values."
+            gh issue comment "$ISSUE_NUMBER" -R "$REPO" -b "$comment"
+            gh issue close "$ISSUE_NUMBER" -R "$REPO" -r "not planned"
+            echo "::error::Validation failed — see issue comment for details"
             exit 1
           fi
 

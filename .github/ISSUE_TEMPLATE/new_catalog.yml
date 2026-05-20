@@ -15,7 +15,7 @@ body:
     id: catalog_name
     attributes:
       label: Catalog name
-      description: "Convention: `<domain>_<env>` — e.g. `finance_prod`, `marketing_dev`."
+      description: "Lowercase letters, digits, and underscores only — Unity Catalog does not allow hyphens. Convention: `<domain>_<env>` (e.g. `finance_prod`, `marketing_dev`)."
       placeholder: "finance_prod"
     validations:
       required: true
