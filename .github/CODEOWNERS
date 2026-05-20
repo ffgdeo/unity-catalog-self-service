@@ -1,0 +1,25 @@
+# CODEOWNERS — demonstrates the per-path approval routing pattern.
+#
+# In the real implementation, replace the placeholder owner (@ffgdeo) with the
+# actual GitHub team for each data owner, e.g.:
+#   /catalogs/finance_prod/  @procore/data-owners-finance
+#   /catalogs/marketing_prod/ @procore/data-owners-marketing
+#   /modules/                 @procore/platform-team
+#
+# For this reference repo to function as a demo, we use a single placeholder
+# owner so that auto-assigned reviews resolve to a real user.
+
+# Modules: pattern owners only
+/modules/                              @ffgdeo
+
+# Catalogs: data owner of each catalog (one per directory)
+/catalogs/                             @ffgdeo
+
+# Groups: data owner of the catalog the group belongs to
+/groups/                               @ffgdeo
+
+# Admin groups: platform team only
+/admins/                               @ffgdeo
+
+# CODEOWNERS itself: platform team only
+/.github/CODEOWNERS                    @ffgdeo

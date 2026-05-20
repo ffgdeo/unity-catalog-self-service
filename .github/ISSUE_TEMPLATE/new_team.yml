@@ -1,0 +1,63 @@
+name: New team request
+description: Request a new project team — provisions service principal, cluster policy, sandbox schema, and workspace assignment.
+title: "[new-team] <team_name>"
+labels: ["new-team"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Request a new project team
+        Fill in the fields below. When you submit, a GitHub Action will open a pull request adding
+        the corresponding Terraform configuration. The PR will be auto-routed to the appropriate
+        data owner via CODEOWNERS for review.
+
+  - type: input
+    id: team_name
+    attributes:
+      label: Team name
+      description: Lowercase, hyphen-separated. Must match an existing IdP-synced group named `team-<team_name>`.
+      placeholder: "data-platform"
+    validations:
+      required: true
+
+  - type: input
+    id: workspace_id
+    attributes:
+      label: Workspace ID
+      description: Numeric Databricks workspace ID where this team should be assigned.
+      placeholder: "1234567890"
+    validations:
+      required: true
+
+  - type: input
+    id: sandbox_catalog
+    attributes:
+      label: Sandbox catalog
+      description: Existing catalog where this team's sandbox schema will be created.
+      placeholder: "sandboxes"
+    validations:
+      required: true
+
+  - type: input
+    id: cost_center
+    attributes:
+      label: Cost center
+      description: For chargeback tagging. Must match an existing cost center code.
+      placeholder: "ENG-DATA-001"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: data_domain
+    attributes:
+      label: Data domain
+      description: Which business domain does this team belong to?
+      options:
+        - engineering
+        - finance
+        - marketing
+        - operations
+        - data-science
+        - other
+    validations:
+      required: true

@@ -1,0 +1,170 @@
+name: New catalog request → PR
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  open-pr:
+    if: contains(github.event.issue.labels.*.name, 'new-catalog')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse issue body
+        id: parse
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          extract() {
+            python3 -c "
+          import os, re, sys
+          body = os.environ['BODY']
+          label = sys.argv[1]
+          m = re.search(r'^###\s+' + re.escape(label) + r'\s*\n+(.+?)(?=\n###|\Z)', body, re.M | re.S)
+          if not m: sys.exit(f'missing field: {label}')
+          print(m.group(1).strip())
+          " "$1"
+          }
+
+          catalog_name=$(extract "Catalog name")
+          storage_root=$(extract "Storage root (S3/GCS/ADLS URL)")
+          data_owner_team=$(extract "Data owner GitHub team")
+          cost_center=$(extract "Cost center")
+          data_domain=$(extract "Data domain")
+          description=$(extract "Catalog description")
+
+          if ! [[ "$catalog_name" =~ ^[a-z][a-z0-9_]*$ ]]; then
+            echo "::error::catalog_name must be lowercase letters, digits, and underscores. Got: $catalog_name"
+            exit 1
+          fi
+
+          {
+            echo "catalog_name=$catalog_name"
+            echo "storage_root=$storage_root"
+            echo "data_owner_team=$data_owner_team"
+            echo "cost_center=$cost_center"
+            echo "data_domain=$data_domain"
+            echo "description<<EOD"
+            echo "$description"
+            echo "EOD"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate Terraform files and CODEOWNERS entry
+        env:
+          CATALOG_NAME: ${{ steps.parse.outputs.catalog_name }}
+          STORAGE_ROOT: ${{ steps.parse.outputs.storage_root }}
+          DATA_OWNER_TEAM: ${{ steps.parse.outputs.data_owner_team }}
+          COST_CENTER: ${{ steps.parse.outputs.cost_center }}
+          DATA_DOMAIN: ${{ steps.parse.outputs.data_domain }}
+          DESCRIPTION: ${{ steps.parse.outputs.description }}
+        run: |
+          mkdir -p "catalogs/${CATALOG_NAME}"
+
+          # groups.tf — the four standard per-catalog groups
+          cat > "catalogs/${CATALOG_NAME}/groups.tf" <<EOF
+          resource "databricks_group" "owners" {
+            display_name = "${CATALOG_NAME}-owners"
+          }
+          resource "databricks_group" "engineers" {
+            display_name = "${CATALOG_NAME}-engineers"
+          }
+          resource "databricks_group" "readers" {
+            display_name = "${CATALOG_NAME}-readers"
+          }
+          resource "databricks_group" "gold_readers" {
+            display_name = "${CATALOG_NAME}-gold-readers"
+          }
+          EOF
+
+          # catalog.tf
+          cat > "catalogs/${CATALOG_NAME}/catalog.tf" <<EOF
+          module "${CATALOG_NAME}" {
+            source       = "../../modules/uc_catalog"
+            name         = "${CATALOG_NAME}"
+            owner_group  = databricks_group.owners.display_name
+            storage_root = "${STORAGE_ROOT}"
+            comment      = "${DESCRIPTION}"
+            tags = {
+              cost_center = "${COST_CENTER}"
+              data_domain = "${DATA_DOMAIN}"
+            }
+          }
+          EOF
+
+          # schemas.tf — bronze/silver/gold
+          cat > "catalogs/${CATALOG_NAME}/schemas.tf" <<EOF
+          module "bronze" {
+            source        = "../../modules/uc_schema"
+            catalog_name  = module.${CATALOG_NAME}.catalog_name
+            name          = "bronze"
+            owner_group   = databricks_group.engineers.display_name
+            reader_groups = [databricks_group.readers.display_name]
+          }
+
+          module "silver" {
+            source        = "../../modules/uc_schema"
+            catalog_name  = module.${CATALOG_NAME}.catalog_name
+            name          = "silver"
+            owner_group   = databricks_group.engineers.display_name
+            reader_groups = [databricks_group.readers.display_name]
+          }
+
+          module "gold" {
+            source        = "../../modules/uc_schema"
+            catalog_name  = module.${CATALOG_NAME}.catalog_name
+            name          = "gold"
+            owner_group   = databricks_group.engineers.display_name
+            reader_groups = [
+              databricks_group.readers.display_name,
+              databricks_group.gold_readers.display_name,
+            ]
+          }
+          EOF
+
+          # Append CODEOWNERS line (will require platform-team review since this PR touches CODEOWNERS)
+          {
+            echo ""
+            echo "# Added for catalog ${CATALOG_NAME} (auto-generated)"
+            echo "/catalogs/${CATALOG_NAME}/              ${DATA_OWNER_TEAM}"
+            echo "/groups/${CATALOG_NAME}-*               ${DATA_OWNER_TEAM}"
+          } >> .github/CODEOWNERS
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: new-catalog/${{ steps.parse.outputs.catalog_name }}
+          base: main
+          commit-message: "Add catalog ${{ steps.parse.outputs.catalog_name }}"
+          title: "Add catalog `${{ steps.parse.outputs.catalog_name }}` (issue #${{ github.event.issue.number }})"
+          body: |
+            Auto-generated from issue #${{ github.event.issue.number }}.
+
+            **Catalog:** `${{ steps.parse.outputs.catalog_name }}`
+            **Storage root:** `${{ steps.parse.outputs.storage_root }}`
+            **Data owner:** ${{ steps.parse.outputs.data_owner_team }}
+            **Cost center:** `${{ steps.parse.outputs.cost_center }}`
+            **Data domain:** `${{ steps.parse.outputs.data_domain }}`
+
+            This PR touches `.github/CODEOWNERS`, so it requires platform-team approval.
+            After merge, all future changes under `/catalogs/${{ steps.parse.outputs.catalog_name }}/`
+            will route to ${{ steps.parse.outputs.data_owner_team }}.
+
+            Closes #${{ github.event.issue.number }} on merge.
+          labels: new-catalog, auto-generated
+
+      - name: Comment on issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: 'Pull request opened — platform team will review.'
+            })

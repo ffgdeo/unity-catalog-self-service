@@ -1,0 +1,64 @@
+name: New project catalog request
+description: Request a new project catalog — provisions catalog, four standard groups, and bronze/silver/gold schemas.
+title: "[new-catalog] <catalog_name>"
+labels: ["new-catalog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Request a new project catalog
+        This is a one-time setup for a new project. The PR will be routed to the platform team for
+        initial review (because it adds a new CODEOWNERS entry). After merge, all future changes
+        under the new catalog will route to the data owner you specify.
+
+  - type: input
+    id: catalog_name
+    attributes:
+      label: Catalog name
+      description: "Convention: `<domain>_<env>` — e.g. `finance_prod`, `marketing_dev`."
+      placeholder: "finance_prod"
+    validations:
+      required: true
+
+  - type: input
+    id: storage_root
+    attributes:
+      label: Storage root (S3/GCS/ADLS URL)
+      description: External location must already exist. Owned by metastore admins.
+      placeholder: "s3://acme-data-finance-prod/"
+    validations:
+      required: true
+
+  - type: input
+    id: data_owner_team
+    attributes:
+      label: Data owner GitHub team
+      description: GitHub team handle that will own access decisions for this catalog (e.g. `@acme/data-owners-finance`).
+      placeholder: "@acme/data-owners-finance"
+    validations:
+      required: true
+
+  - type: input
+    id: cost_center
+    attributes:
+      label: Cost center
+      placeholder: "ENG-FIN-001"
+    validations:
+      required: true
+
+  - type: input
+    id: data_domain
+    attributes:
+      label: Data domain
+      placeholder: "finance"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Catalog description
+      description: Shown in the Unity Catalog UI.
+      placeholder: "Finance domain — production data"
+    validations:
+      required: true
