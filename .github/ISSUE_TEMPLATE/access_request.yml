@@ -1,0 +1,58 @@
+name: Access request
+description: Request membership in a Unity Catalog group (e.g. catalog readers, gold-readers, engineers).
+title: "[access-request] <catalog> / <role>"
+labels: ["access-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Request access to a catalog
+        Fill in the fields below. A pull request will be opened that adds you to the relevant group.
+        The pull request will be auto-routed to the catalog's data owner for approval via CODEOWNERS.
+
+        **You only need to fill this out once per (catalog, role) combination.** If you already have the
+        role you're requesting, no new request is needed.
+
+  - type: input
+    id: catalog_name
+    attributes:
+      label: Catalog name
+      description: The Unity Catalog you need access to. Lowercase letters, digits, and underscores only.
+      placeholder: "finance_prod"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Role
+      description: |
+        - **gold-readers** — SELECT on the gold schema only. Most common for analysts and downstream consumers.
+        - **readers** — SELECT on all schemas (bronze, silver, gold). For engineers who need full visibility.
+        - **engineers** — Write access on all schemas. For data producers.
+        - **owners** — Full control (rare; data-owner team only).
+      options:
+        - gold-readers
+        - readers
+        - engineers
+        - owners
+    validations:
+      required: true
+
+  - type: input
+    id: user_email
+    attributes:
+      label: Your Databricks user email
+      description: The email you log in to Databricks with. Must already exist as a user in the Databricks account.
+      placeholder: "alice.smith@example.com"
+    validations:
+      required: true
+
+  - type: textarea
+    id: justification
+    attributes:
+      label: Business justification
+      description: Why do you need this access? The data owner will read this when reviewing.
+      placeholder: "I'm joining the FP&A team and need access to revenue reports."
+    validations:
+      required: true

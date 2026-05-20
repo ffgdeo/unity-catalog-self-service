@@ -66,12 +66,23 @@ Branch protection on `main` requires CODEOWNER review → data owners physically
 
 ## Try it: form → PR demo
 
-This repo includes two GitHub Issue Forms that demonstrate the self-service pattern. Each one opens a real PR when submitted:
+This repo includes three GitHub Issue Forms that demonstrate the self-service pattern. Each one opens a real PR when submitted:
 
-- **["New team request"](../../issues/new?template=new_team.yml)** — fills in `teams/<team_name>/main.tf` for an existing project
-- **["New project catalog request"](../../issues/new?template=new_catalog.yml)** — provisions a full catalog: 4 groups, 3 schemas (bronze/silver/gold), CODEOWNERS entry
+- **["Access request"](../../issues/new?template=access_request.yml)** — daily operation: grant a user a role on an existing catalog (`gold-readers`, `readers`, `engineers`, or `owners`). Generates one TF file per access grant under `catalogs/<catalog>/access/`.
+- **["New project catalog request"](../../issues/new?template=new_catalog.yml)** — one-time: provisions a full catalog with 4 groups, 3 schemas (bronze/silver/gold), and a CODEOWNERS entry.
+- **["New team request"](../../issues/new?template=new_team.yml)** — one-time: onboards a team with a service principal, cluster policy, sandbox schema, and workspace assignment.
 
 The workflows in `.github/workflows/` parse the issue, write the Terraform files, and open a PR for review. In a real deployment the PR would route via CODEOWNERS to the appropriate data owner and CI would apply on merge — here it stops at the PR open step so you can inspect what gets generated.
+
+### Wiring the access-request form into Unity Catalog
+
+The access-request form can be plugged into Unity Catalog's **Access Request Destinations** feature (Public Preview). Configure it as a redirect URL on the metastore (or per-catalog) and users clicking "Request access" in the UC UI will land directly on this form:
+
+```
+https://github.com/ffgdeo/unity-catalog-self-service/issues/new?template=access_request.yml
+```
+
+See the [Databricks docs on access request destinations](https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/access-request-destinations) for configuration steps.
 
 ## What this is not
 
