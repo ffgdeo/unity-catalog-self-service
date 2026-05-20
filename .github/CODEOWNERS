@@ -23,3 +23,7 @@
 
 # CODEOWNERS itself: platform team only
 /.github/CODEOWNERS                    @ffgdeo
+
+# Added for catalog finance_prod (auto-generated)
+/catalogs/finance_prod/              @ffgdeo
+/groups/finance_prod-*               @ffgdeo
